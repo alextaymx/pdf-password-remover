@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Password Remover</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-hover: #1a1a25;
+            --border: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent: #ff3366;
+            --accent-glow: rgba(255, 51, 102, 0.3);
+            --success: #00cc88;
+            --error: #ff4455;
+            --gradient-1: linear-gradient(135deg, #ff3366 0%, #ff6b35 100%);
+            --gradient-2: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.4;
+            background-image: 
+                radial-gradient(ellipse at 20% 20%, rgba(255, 51, 102, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(118, 75, 162, 0.1) 0%, transparent 70%);
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: var(--gradient-1);
+            border-radius: 20px;
+            margin-bottom: 24px;
+            font-size: 40px;
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: var(--accent);
+        }
+
+        .drop-zone:hover::before,
+        .drop-zone.dragover::before {
+            opacity: 0.05;
+        }
+
+        .drop-zone-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .drop-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .drop-text {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .drop-hint {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* File list */
+        .file-list {
+            margin-top: 24px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: var(--bg-hover);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            overflow: hidden;
+        }
+
+        .file-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .file-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-size {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 20px;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .remove-btn:hover {
+            color: var(--error);
+        }
+
+        /* Password input */
+        .password-section {
+            margin-top: 24px;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            padding: 16px 48px 16px 16px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .input-wrapper input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 20px;
+            padding: 4px;
+        }
+
+        /* Submit button */
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            margin-top: 24px;
+            background: var(--gradient-1);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .submit-btn.loading {
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        .submit-btn.loading .spinner {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results */
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .results-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .results-count {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            background: var(--bg-hover);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            gap: 12px;
+        }
+
+        .result-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .result-icon.success {
+            color: var(--success);
+        }
+
+        .result-icon.error {
+            color: var(--error);
+        }
+
+        .result-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .result-filename {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .result-message {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            margin-top: 16px;
+            background: var(--success);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 204, 136, 0.3);
+        }
+
+        .reset-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            margin-top: 16px;
+            margin-left: 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 48px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">🔓</div>
+            <h1>PDF Password Remover</h1>
+            <p class="subtitle">Batch unlock your protected PDFs instantly</p>
+        </header>
+
+        <div class="card" id="uploadCard">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <span class="drop-icon">📄</span>
+                    <p class="drop-text">Drop your PDF files here</p>
+                    <p class="drop-hint">or click to browse</p>
+                </div>
+                <input type="file" id="fileInput" multiple accept=".pdf">
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+
+            <div class="password-section" id="passwordSection" style="display: none;">
+                <div class="input-group">
+                    <label for="password">PDF Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="password" placeholder="Enter the PDF password">
+                        <button type="button" class="toggle-password" id="togglePassword">👁</button>
+                    </div>
+                </div>
+
+                <button class="submit-btn" id="submitBtn" disabled>
+                    <span class="spinner"></span>
+                    <span class="btn-text">Unlock PDFs</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="card results" id="results">
+            <div class="results-header">
+                <span class="results-title">Results</span>
+                <span class="results-count" id="resultsCount"></span>
+            </div>
+            <div id="resultsList"></div>
+            <div style="text-align: center;">
+                <button class="download-btn" id="downloadBtn" style="display: none;">
+                    📥 Download
+                </button>
+                <button class="reset-btn" id="resetBtn">
+                    ↻ Process More
+                </button>
+            </div>
+        </div>
+
+        <footer>
+            <p>Your files are processed locally and never stored on any server.</p>
+        </footer>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const passwordSection = document.getElementById('passwordSection');
+        const password = document.getElementById('password');
+        const togglePassword = document.getElementById('togglePassword');
+        const submitBtn = document.getElementById('submitBtn');
+        const results = document.getElementById('results');
+        const resultsList = document.getElementById('resultsList');
+        const resultsCount = document.getElementById('resultsCount');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const uploadCard = document.getElementById('uploadCard');
+
+        let selectedFiles = [];
+        let currentSessionId = null;
+
+        // Drag and drop handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            const pdfFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            
+            pdfFiles.forEach(file => {
+                if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+
+            renderFileList();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function renderFileList() {
+            fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <span class="file-icon">📄</span>
+                        <span class="file-name">${file.name}</span>
+                    </div>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                    <button class="remove-btn" onclick="removeFile(${index})">✕</button>
+                </div>
+            `).join('');
+
+            passwordSection.style.display = selectedFiles.length > 0 ? 'block' : 'none';
+            updateSubmitState();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderFileList();
+        }
+
+        // Password visibility toggle
+        togglePassword.addEventListener('click', () => {
+            const type = password.type === 'password' ? 'text' : 'password';
+            password.type = type;
+            togglePassword.textContent = type === 'password' ? '👁' : '🙈';
+        });
+
+        password.addEventListener('input', updateSubmitState);
+
+        function updateSubmitState() {
+            submitBtn.disabled = selectedFiles.length === 0 || password.value.trim() === '';
+        }
+
+        // Submit handler
+        submitBtn.addEventListener('click', async () => {
+            if (submitBtn.disabled) return;
+
+            submitBtn.classList.add('loading');
+            submitBtn.querySelector('.btn-text').textContent = 'Processing...';
+
+            const formData = new FormData();
+            formData.append('password', password.value);
+            selectedFiles.forEach(file => formData.append('files', file));
+
+            try {
+                const response = await fetch('/unlock', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResults(data);
+                } else {
+                    alert(data.error || 'An error occurred');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            } finally {
+                submitBtn.classList.remove('loading');
+                submitBtn.querySelector('.btn-text').textContent = 'Unlock PDFs';
+            }
+        });
+
+        function showResults(data) {
+            currentSessionId = data.session_id;
+            
+            resultsList.innerHTML = data.results.map(result => `
+                <div class="result-item">
+                    <span class="result-icon ${result.success ? 'success' : 'error'}">
+                        ${result.success ? '✓' : '✗'}
+                    </span>
+                    <div class="result-details">
+                        <div class="result-filename">${result.filename}</div>
+                        <div class="result-message">
+                            ${result.success ? 'Unlocked → ' + result.output : result.error}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            resultsCount.textContent = `${data.success_count} of ${data.total_count} unlocked`;
+            
+            downloadBtn.style.display = data.success_count > 0 ? 'inline-flex' : 'none';
+            downloadBtn.innerHTML = data.success_count === 1 
+                ? '📥 Download PDF' 
+                : '📥 Download ZIP';
+
+            uploadCard.style.display = 'none';
+            results.classList.add('show');
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (currentSessionId) {
+                window.location.href = `/download/${currentSessionId}`;
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            selectedFiles = [];
+            password.value = '';
+            fileInput.value = '';
+            currentSessionId = null;
+            
+            renderFileList();
+            results.classList.remove('show');
+            uploadCard.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
+
