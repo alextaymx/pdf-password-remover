@@ -6,7 +6,8 @@ CLI tool for batch removing passwords from PDF files.
 import argparse
 import sys
 from pathlib import Path
-import pikepdf
+from pypdf import PdfReader, PdfWriter
+from pypdf.errors import PdfReadError
 
 
 def remove_password(input_path: Path, output_path: Path, password: str) -> bool:
@@ -22,10 +23,26 @@ def remove_password(input_path: Path, output_path: Path, password: str) -> bool:
         True if successful, False otherwise
     """
     try:
-        with pikepdf.open(input_path, password=password) as pdf:
-            pdf.save(output_path)
+        reader = PdfReader(str(input_path), password=password)
+        
+        # Check if decryption was successful
+        if reader.is_encrypted:
+            try:
+                reader.decrypt(password)
+            except Exception:
+                print(f"  ✗ Wrong password for: {input_path.name}")
+                return False
+        
+        # Write decrypted PDF
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        
+        with open(output_path, "wb") as f:
+            writer.write(f)
+        
         return True
-    except pikepdf.PasswordError:
+    except PdfReadError:
         print(f"  ✗ Wrong password for: {input_path.name}")
         return False
     except Exception as e:

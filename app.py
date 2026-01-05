@@ -12,9 +12,21 @@ from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
-import pikepdf
+from fastapi.middleware.cors import CORSMiddleware
+from pypdf import PdfReader, PdfWriter
+from pypdf.errors import PdfReadError
 
 app = FastAPI(title="PDF Password Remover")
+
+# Enable CORS for frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 templates = Jinja2Templates(directory="templates")
 
 # Temporary storage for processed files
@@ -59,29 +71,43 @@ async def unlock_pdfs(
             input_stream = io.BytesIO(file_bytes)
             
             # Try to open with password
-            with pikepdf.open(input_stream, password=password) as pdf:
-                output_stream = io.BytesIO()
-                pdf.save(output_stream)
-                output_stream.seek(0)
+            reader = PdfReader(input_stream, password=password)
+            
+            # Check if decryption was successful
+            if reader.is_encrypted:
+                try:
+                    reader.decrypt(password)
+                except Exception:
+                    raise PdfReadError("Wrong password")
+            
+            # Write decrypted PDF
+            writer = PdfWriter()
+            for page in reader.pages:
+                writer.add_page(page)
+            
+            output_stream = io.BytesIO()
+            writer.write(output_stream)
+            output_stream.seek(0)
+            
+            # Store processed file
+            new_filename = f"{Path(file.filename).stem}_unlocked.pdf"
+            processed.append({
+                "filename": new_filename,
+                "data": output_stream.getvalue()
+            })
+            
+            results.append({
+                "filename": file.filename,
+                "success": True,
+                "output": new_filename
+            })
                 
-                # Store processed file
-                new_filename = f"{Path(file.filename).stem}_unlocked.pdf"
-                processed.append({
-                    "filename": new_filename,
-                    "data": output_stream.getvalue()
-                })
-                
-                results.append({
-                    "filename": file.filename,
-                    "success": True,
-                    "output": new_filename
-                })
-                
-        except pikepdf.PasswordError:
+        except PdfReadError as e:
+            error_msg = str(e) if "password" in str(e).lower() else "Wrong password or corrupted PDF"
             results.append({
                 "filename": file.filename,
                 "success": False,
-                "error": "Wrong password"
+                "error": error_msg
             })
         except Exception as e:
             results.append({
